@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>Dice Game Logic</h1>
+    <input type="text" id="players" placeholder="players"/>
+    <input type="text" id="dices" placeholder="dices"/>
+    <button onclick="startGame()">Start Game</button>
+    <br>
+    <small id="errorMsg"></small>
+    <br>
+    <br>
+    <div id="stateText">Result will show here</div>
+    <div id="result"></div>
+</body>
+
+<script>
+    let players = []
+    let dices = []
+    let points = []
+    let gameRecord = []
+    let gamePlay = -1
+    let readyPlayer = 0
+
+    async function startGame() {
+        const playerForm = document.getElementById('players').value
+        const diceForm = document.getElementById('dices').value
+        const errorMsg = document.getElementById('errorMsg')
+                errorMsg.innerHTML = ''
+                document.getElementById('result').innerHTML = ''
+
+        players = []
+        dices = []
+        points = []
+        gameRecord = []
+        gamePlay = -1
+        readyPlayer = 0
+        
+        if (!playerForm || !diceForm) {
+            errorMsg.innerHTML = 'Player & Dice is required'
+            return
+        }
+
+        //set ready player
+        readyPlayer = parseInt(playerForm)
+
+        await createPoint(playerForm)
+        await createPlayer(playerForm, diceForm)
+        await checkAvailablePlayer(players)
+    }
+
+    function createPoint(nPlayers) {
+        return new Promise(function(resolve) {
+            for (let p=0; p < nPlayers; p++) {
+                points[`player-${p+1}`] = 0
+            }
+
+            resolve()
+        })
+    }
+
+    function createPlayer(nPlayers, nDices) {
+        return new Promise(function(resolve) {
+            for (let p=0; p < nPlayers; p++) {
+                players[`player-${p+1}`] = []
+                for (let d=0; d < nDices; d++) {
+                    players[`player-${p+1}`].push(Math.floor(Math.random() * 6) + 1);
+                }
+            }
+
+            resolve()
+        })
+    }
+
+    function playDice(player) {
+        return new Promise(function(resolve) {
+            let i = 1
+            let temptData = []
+
+            for (let p in players) {
+                // init zero array
+                temptData[0] = []
+
+                for (let d=0; d < players[`player-${i}`].length; d++) {
+                    temptData[0].push(Math.floor(Math.random() * 6) + 1)
+                }
+
+                // push data from temptData
+                players[`player-${i}`] = temptData[0];
+
+                //set game record original
+                gameRecord[gamePlay].orinal[`player-${i}`] = players[`player-${i}`]
+
+                i++
+            }
+
+            resolve()
+        })
+    }
+
+    function evaluate(playerDatas) {
+        return new Promise(function(resolve) {
+            let i = 1
+
+            for (let p in playerDatas) {
+
+                // count point
+                points[`player-${i}`] += playerDatas[`player-${i}`].filter(function(x) {
+                    return x === 6
+                }).length
+
+                // record point
+                gameRecord[gamePlay].point[`player-${i}`] = points[`player-${i}`]
+
+                // remove dice if 6
+                playerDatas[`player-${i}`] = playerDatas[`player-${i}`].filter(function(x) {
+                    return x !== 6
+                })
+
+                // set game record evaluate
+                gameRecord[gamePlay].evaluate[`player-${i}`] = playerDatas[`player-${i}`]
+                
+                i++
+                
+            }
+
+            resolve()
+        })
+    }
+
+    async function checkAvailablePlayer(players) {
+        let i = 1
+        readyPlayer = 0
+
+        await new Promise(function(resolve) {
+            for (let p in players) {
+                if (players[`player-${i}`].length > 0) {
+                    readyPlayer = readyPlayer + 1
+                }
+                i++
+            }
+
+            resolve()
+        })
+        
+
+        if (readyPlayer > 1) {
+            gamePlay = gamePlay + 1
+
+            //create new record game set
+            gameRecord[gamePlay] = {
+                orinal: [],
+                evaluate: [],
+                point: []
+            }
+
+            await playDice(players)
+            await evaluate(players)
+            await checkAvailablePlayer(players)
+
+        } else {
+            const element = document.getElementById('result')
+
+            gameRecord.forEach((ele, idx) => {
+                let text = ''
+                const createEle = document.createElement('div')
+                text = `Game ${idx+1} <br>`
+                text += `Original <br>`
+                text += `==================================================== <br>`
+                        for (let ori in ele.orinal) {
+                            text += `${ori}[${idx > 0 ? gameRecord[idx-1].point[ori] : 0}]:[ ${ele.orinal[ori].toString()} ] <br>`
+                            
+                        }
+                text += `---------------------------------------------------------------------------------------- <br>`
+                text += `Evaluate <br>`
+                text += `==================================================== <br>`
+                        for (let evaluate in ele.evaluate) {
+                            text += `${evaluate}[${ele.point[evaluate]}]:[ ${ele.evaluate[evaluate].toString()} ] <br>`
+                            
+                        }
+                text += `---------------------------------------------------------------------------------------- <br> <br>`
+                createEle.innerHTML = text
+                element.appendChild(createEle)
+            })
+
+            // find winner
+            let curentBigest = {
+                winner: null,
+                point: 0
+            }
+
+            for (point in points) {
+                if (curentBigest.point < points[point]) {
+                    curentBigest =  { winner: point, point: points[point] }
+                }
+            }
+
+            const createEle = document.createElement('div')
+            let text
+                text = `Winner is <b>${curentBigest.winner}</b> with point <b>${curentBigest.point}</b>`
+                createEle.innerHTML = text
+                element.appendChild(createEle)
+        }
+    }
+</script>
+</html>
